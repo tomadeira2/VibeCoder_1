@@ -18,6 +18,7 @@ export interface Tournament {
   id: string;
   name: string;
   date: string;
+  type: 4 | 6 | 8;
   status: 'upcoming' | 'in_progress' | 'completed';
   playerIds: string[];
   roundRobinMatches: Match[];
@@ -33,8 +34,18 @@ export interface Match {
   team2: Team;
   score?: Score;
   stage: 'round_robin' | 'quarter_final' | 'semi_final' | 'final';
+  group?: 'A' | 'B';
   completed: boolean;
   playedAt?: string;
+}
+
+export interface TournamentConfig {
+  type: 4 | 6 | 8;
+  requiredPlayers: number;
+  teamsCount: number;
+  useGroups: boolean;
+  advanceToKnockout: number;
+  description: string;
 }
 
 export interface Team {

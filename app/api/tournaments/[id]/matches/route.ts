@@ -38,15 +38,34 @@ export async function PATCH(
     const allRRComplete = tournament.roundRobinMatches.every((m: Match) => m.completed);
 
     if (allRRComplete && tournament.knockoutMatches.length === 0) {
-      // Generate knockout matches
-      const standings = calculateRoundRobinStandings(tournament.roundRobinMatches);
-      const knockoutMatches = generateKnockoutMatches(tournament.id, standings);
-      tournament.knockoutMatches = knockoutMatches;
+      // Generate knockout matches based on tournament type
+      if (tournament.type === 8) {
+        // For 8-player tournaments, calculate group standings separately
+        const groupAStandings = calculateRoundRobinStandings(tournament.roundRobinMatches, 'A');
+        const groupBStandings = calculateRoundRobinStandings(tournament.roundRobinMatches, 'B');
+        const knockoutMatches = generateKnockoutMatches(
+          tournament.id,
+          [],
+          tournament.type,
+          groupAStandings,
+          groupBStandings
+        );
+        tournament.knockoutMatches = knockoutMatches;
+      } else {
+        // For 4 and 6-player tournaments
+        const standings = calculateRoundRobinStandings(tournament.roundRobinMatches);
+        const knockoutMatches = generateKnockoutMatches(
+          tournament.id,
+          standings,
+          tournament.type
+        );
+        tournament.knockoutMatches = knockoutMatches;
+      }
       tournament.status = 'in_progress';
     }
 
-    // Check if both semi-finals are complete and generate final
-    if (tournament.knockoutMatches.length === 2) {
+    // Check if both semi-finals are complete and generate final (only for 6 and 8 player tournaments)
+    if (tournament.type !== 4 && tournament.knockoutMatches.length === 2) {
       const allSFComplete = tournament.knockoutMatches.every((m: Match) => m.completed);
       if (allSFComplete) {
         const finalMatch = generateFinalMatch(

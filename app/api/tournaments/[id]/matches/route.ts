@@ -5,6 +5,7 @@ import {
   calculateRoundRobinStandings,
   generateKnockoutMatches,
   generateFinalMatch,
+  generatePlacementMatches,
   calculatePlayerTournamentPoints,
 } from '@/lib/tournament';
 
@@ -64,8 +65,9 @@ export async function PATCH(
       tournament.status = 'in_progress';
     }
 
-    // Check if both semi-finals are complete and generate final (only for 6 and 8 player tournaments)
-    if (tournament.type !== 4 && tournament.knockoutMatches.length === 2) {
+    // Check if semi-finals are complete and generate finals/placement matches
+    if (tournament.type === 6 && tournament.knockoutMatches.length === 2) {
+      // For 6-player tournaments
       const allSFComplete = tournament.knockoutMatches.every((m: Match) => m.completed);
       if (allSFComplete) {
         const finalMatch = generateFinalMatch(
@@ -77,11 +79,34 @@ export async function PATCH(
           tournament.knockoutMatches.push(finalMatch);
         }
       }
+    } else if (tournament.type === 8 && tournament.knockoutMatches.length === 4) {
+      // For 8-player tournaments with cross-bracket playoffs
+      const semiFinals = tournament.knockoutMatches.filter((m: Match) => m.stage === 'semi_final');
+      const middleSemis = tournament.knockoutMatches.filter((m: Match) => m.stage === 'middle_semi');
+
+      const newMatches = generatePlacementMatches(tournament.id, semiFinals, middleSemis);
+      if (newMatches.length > 0) {
+        tournament.knockoutMatches.push(...newMatches);
+      }
     }
 
     // Check if tournament is complete
     const finals = tournament.knockoutMatches.filter((m: Match) => m.stage === 'final');
-    if (finals.length > 0 && finals[0].completed) {
+    let tournamentComplete = false;
+
+    if (tournament.type === 8) {
+      // For 8-player tournaments, check if all placement matches are complete
+      const placementStages = ['final', 'third_place', 'fifth_place', 'seventh_place'];
+      const placementMatches = tournament.knockoutMatches.filter((m: Match) =>
+        placementStages.includes(m.stage)
+      );
+      tournamentComplete = placementMatches.length === 4 && placementMatches.every((m: Match) => m.completed);
+    } else {
+      // For 4 and 6-player tournaments, just check if final is complete
+      tournamentComplete = finals.length > 0 && finals[0].completed;
+    }
+
+    if (tournamentComplete) {
       tournament.status = 'completed';
 
       // Update player stats

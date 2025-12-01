@@ -23,10 +23,10 @@ export const TOURNAMENT_CONFIGS: Record<4 | 6 | 8, TournamentConfig> = {
   8: {
     type: 8,
     requiredPlayers: 8,
-    teamsCount: 12,
+    teamsCount: 8,
     useGroups: true,
-    advanceToKnockout: 4,
-    description: '8 players (12 teams in 2 brackets of 6) - Brackets, top 2 from each bracket to semi-finals',
+    advanceToKnockout: 8,
+    description: '8 players (2 groups of 4) - Round robin in groups, cross-bracket playoffs for all positions',
   },
 };
 
@@ -47,11 +47,11 @@ export function generateTeams(playerIds: string[], tournamentType: 4 | 6 | 8): T
     }
   }
 
-  // For 8-player tournaments, select 12 teams (6 per bracket)
+  // For 8-player tournaments, select 8 teams (4 per group)
   if (tournamentType === 8) {
-    // Shuffle and select 12 teams
+    // Shuffle and select 8 teams (2 groups of 4)
     const shuffled = allTeams.sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 12);
+    return shuffled.slice(0, 8);
   }
 
   return allTeams;
@@ -67,12 +67,12 @@ export function generateRoundRobinMatches(
 ): Match[] {
   const matches: Match[] = [];
 
-  if (useGroups && teams.length === 12) {
-    // Split into 2 brackets of 6 teams each
-    const groupA = teams.slice(0, 6);
-    const groupB = teams.slice(6, 12);
+  if (useGroups && teams.length === 8) {
+    // Split into 2 groups of 4 teams each
+    const groupA = teams.slice(0, 4);
+    const groupB = teams.slice(4, 8);
 
-    // Generate matches for Bracket A
+    // Generate matches for Group A (each team plays 3 matches)
     for (let i = 0; i < groupA.length; i++) {
       for (let j = i + 1; j < groupA.length; j++) {
         matches.push({
@@ -87,7 +87,7 @@ export function generateRoundRobinMatches(
       }
     }
 
-    // Generate matches for Bracket B
+    // Generate matches for Group B (each team plays 3 matches)
     for (let i = 0; i < groupB.length; i++) {
       for (let j = i + 1; j < groupB.length; j++) {
         matches.push({
@@ -267,19 +267,16 @@ export function generateKnockoutMatches(
       completed: false,
     });
   } else if (tournamentType === 8) {
-    // 8 players with groups: Top 2 from each group to semi-finals
+    // 8 players with groups: Cross-bracket playoffs for all positions
     if (!groupAStandings || !groupBStandings) return matches;
-    if (groupAStandings.length < 2 || groupBStandings.length < 2) return matches;
+    if (groupAStandings.length < 4 || groupBStandings.length < 4) return matches;
 
-    const groupATop2 = groupAStandings.slice(0, 2);
-    const groupBTop2 = groupBStandings.slice(0, 2);
-
-    // Semi-finals: A1 vs B2, B1 vs A2
+    // Winners bracket semi-finals: 1A vs 2B, 1B vs 2A
     matches.push({
       id: `${tournamentId}-sf-1`,
       tournamentId,
-      team1: { player1Id: groupATop2[0].player1Id, player2Id: groupATop2[0].player2Id },
-      team2: { player1Id: groupBTop2[1].player1Id, player2Id: groupBTop2[1].player2Id },
+      team1: { player1Id: groupAStandings[0].player1Id, player2Id: groupAStandings[0].player2Id },
+      team2: { player1Id: groupBStandings[1].player1Id, player2Id: groupBStandings[1].player2Id },
       stage: 'semi_final',
       completed: false,
     });
@@ -287,9 +284,28 @@ export function generateKnockoutMatches(
     matches.push({
       id: `${tournamentId}-sf-2`,
       tournamentId,
-      team1: { player1Id: groupBTop2[0].player1Id, player2Id: groupBTop2[0].player2Id },
-      team2: { player1Id: groupATop2[1].player1Id, player2Id: groupATop2[1].player2Id },
+      team1: { player1Id: groupBStandings[0].player1Id, player2Id: groupBStandings[0].player2Id },
+      team2: { player1Id: groupAStandings[1].player1Id, player2Id: groupAStandings[1].player2Id },
       stage: 'semi_final',
+      completed: false,
+    });
+
+    // Middle bracket semi-finals: 3A vs 4B, 3B vs 4A
+    matches.push({
+      id: `${tournamentId}-middle-sf-1`,
+      tournamentId,
+      team1: { player1Id: groupAStandings[2].player1Id, player2Id: groupAStandings[2].player2Id },
+      team2: { player1Id: groupBStandings[3].player1Id, player2Id: groupBStandings[3].player2Id },
+      stage: 'middle_semi',
+      completed: false,
+    });
+
+    matches.push({
+      id: `${tournamentId}-middle-sf-2`,
+      tournamentId,
+      team1: { player1Id: groupBStandings[2].player1Id, player2Id: groupBStandings[2].player2Id },
+      team2: { player1Id: groupAStandings[3].player1Id, player2Id: groupAStandings[3].player2Id },
+      stage: 'middle_semi',
       completed: false,
     });
   }
@@ -325,6 +341,85 @@ export function generateFinalMatch(
     stage: 'final',
     completed: false,
   };
+}
+
+/**
+ * Generate placement matches for 8-player tournament from completed semi-finals
+ */
+export function generatePlacementMatches(
+  tournamentId: string,
+  semiFinals: Match[],
+  middleSemis: Match[]
+): Match[] {
+  const matches: Match[] = [];
+
+  // Check if all semi-finals are complete
+  const allSFComplete = semiFinals.every(m => m.completed && m.score);
+  const allMiddleComplete = middleSemis.every(m => m.completed && m.score);
+
+  if (allSFComplete && semiFinals.length === 2) {
+    const sf1 = semiFinals[0];
+    const sf2 = semiFinals[1];
+
+    // Winners to final (1st/2nd place)
+    const sf1Winner = sf1.score!.team1Sets > sf1.score!.team2Sets ? sf1.team1 : sf1.team2;
+    const sf2Winner = sf2.score!.team1Sets > sf2.score!.team2Sets ? sf2.team1 : sf2.team2;
+
+    matches.push({
+      id: `${tournamentId}-final`,
+      tournamentId,
+      team1: sf1Winner,
+      team2: sf2Winner,
+      stage: 'final',
+      completed: false,
+    });
+
+    // Losers to 3rd/4th place match
+    const sf1Loser = sf1.score!.team1Sets < sf1.score!.team2Sets ? sf1.team1 : sf1.team2;
+    const sf2Loser = sf2.score!.team1Sets < sf2.score!.team2Sets ? sf2.team1 : sf2.team2;
+
+    matches.push({
+      id: `${tournamentId}-3rd-place`,
+      tournamentId,
+      team1: sf1Loser,
+      team2: sf2Loser,
+      stage: 'third_place',
+      completed: false,
+    });
+  }
+
+  if (allMiddleComplete && middleSemis.length === 2) {
+    const ms1 = middleSemis[0];
+    const ms2 = middleSemis[1];
+
+    // Winners to 5th/6th place match
+    const ms1Winner = ms1.score!.team1Sets > ms1.score!.team2Sets ? ms1.team1 : ms1.team2;
+    const ms2Winner = ms2.score!.team1Sets > ms2.score!.team2Sets ? ms2.team1 : ms2.team2;
+
+    matches.push({
+      id: `${tournamentId}-5th-place`,
+      tournamentId,
+      team1: ms1Winner,
+      team2: ms2Winner,
+      stage: 'fifth_place',
+      completed: false,
+    });
+
+    // Losers to 7th/8th place match
+    const ms1Loser = ms1.score!.team1Sets < ms1.score!.team2Sets ? ms1.team1 : ms1.team2;
+    const ms2Loser = ms2.score!.team1Sets < ms2.score!.team2Sets ? ms2.team1 : ms2.team2;
+
+    matches.push({
+      id: `${tournamentId}-7th-place`,
+      tournamentId,
+      team1: ms1Loser,
+      team2: ms2Loser,
+      stage: 'seventh_place',
+      completed: false,
+    });
+  }
+
+  return matches;
 }
 
 /**

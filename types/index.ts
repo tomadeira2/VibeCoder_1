@@ -33,7 +33,7 @@ export interface Match {
   team1: Team;
   team2: Team;
   score?: Score;
-  stage: 'round_robin' | 'quarter_final' | 'semi_final' | 'final';
+  stage: 'round_robin' | 'quarter_final' | 'semi_final' | 'final' | 'third_place' | 'fifth_place' | 'seventh_place' | 'middle_semi';
   group?: 'A' | 'B';
   completed: boolean;
   playedAt?: string;

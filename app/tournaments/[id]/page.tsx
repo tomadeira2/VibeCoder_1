@@ -306,14 +306,117 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
           <h2 className="text-2xl font-bold mb-4">Knockout Stage</h2>
 
-          {['semi_final', 'final'].map((stage) => {
-            const matches = tournament.knockoutMatches.filter((m: Match) => m.stage === stage);
-            if (matches.length === 0) return null;
+          {tournament.type === 8 ? (
+            // 8-player tournament with cross-bracket playoffs
+            <>
+              {/* Semi-finals */}
+              {['semi_final', 'middle_semi'].map((stageType) => {
+                const matches = tournament.knockoutMatches.filter((m: Match) => m.stage === stageType);
+                if (matches.length === 0) return null;
 
-            return (
-              <div key={stage} className="mb-6">
-                <h3 className="text-xl font-semibold mb-3 capitalize">
-                  {stage.replace('_', ' ')}
+                const stageTitle = stageType === 'semi_final'
+                  ? 'Winners Bracket Semi-Finals (1st-4th Place)'
+                  : 'Middle Bracket Semi-Finals (5th-8th Place)';
+
+                return (
+                  <div key={stageType} className="mb-6">
+                    <h3 className="text-xl font-semibold mb-3">{stageTitle}</h3>
+                    <div className="space-y-3">
+                      {matches.map((match: Match) => (
+                        <div
+                          key={match.id}
+                          className="border-2 border-blue-200 dark:border-blue-800 rounded p-4 flex justify-between items-center"
+                        >
+                          <div className="flex-1">
+                            <div className="font-medium">
+                              {getPlayerName(match.team1.player1Id)} / {getPlayerName(match.team1.player2Id)}
+                            </div>
+                            <div className="text-sm text-gray-500">vs</div>
+                            <div className="font-medium">
+                              {getPlayerName(match.team2.player1Id)} / {getPlayerName(match.team2.player2Id)}
+                            </div>
+                          </div>
+                          <div className="text-center min-w-[100px]">
+                            {match.completed && match.score ? (
+                              <div className="text-lg font-bold">
+                                {match.score.team1Sets} - {match.score.team2Sets}
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => updateMatchScore(match.id, stageType)}
+                                className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                              >
+                                Enter Score
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Placement Matches */}
+              {[
+                { stage: 'final', title: 'Final (1st/2nd Place)' },
+                { stage: 'third_place', title: '3rd/4th Place' },
+                { stage: 'fifth_place', title: '5th/6th Place' },
+                { stage: 'seventh_place', title: '7th/8th Place' }
+              ].map(({ stage, title }) => {
+                const matches = tournament.knockoutMatches.filter((m: Match) => m.stage === stage);
+                if (matches.length === 0) return null;
+
+                return (
+                  <div key={stage} className="mb-6">
+                    <h3 className="text-xl font-semibold mb-3">{title}</h3>
+                    <div className="space-y-3">
+                      {matches.map((match: Match) => (
+                        <div
+                          key={match.id}
+                          className="border-2 border-green-200 dark:border-green-800 rounded p-4 flex justify-between items-center"
+                        >
+                          <div className="flex-1">
+                            <div className="font-medium">
+                              {getPlayerName(match.team1.player1Id)} / {getPlayerName(match.team1.player2Id)}
+                            </div>
+                            <div className="text-sm text-gray-500">vs</div>
+                            <div className="font-medium">
+                              {getPlayerName(match.team2.player1Id)} / {getPlayerName(match.team2.player2Id)}
+                            </div>
+                          </div>
+                          <div className="text-center min-w-[100px]">
+                            {match.completed && match.score ? (
+                              <div className="text-lg font-bold">
+                                {match.score.team1Sets} - {match.score.team2Sets}
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => updateMatchScore(match.id, stage)}
+                                className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                              >
+                                Enter Score
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          ) : (
+            // 4 and 6-player tournaments
+            <>
+              {['semi_final', 'final'].map((stage) => {
+                const matches = tournament.knockoutMatches.filter((m: Match) => m.stage === stage);
+                if (matches.length === 0) return null;
+
+                return (
+                  <div key={stage} className="mb-6">
+                    <h3 className="text-xl font-semibold mb-3 capitalize">
+                      {stage.replace('_', ' ')}
                 </h3>
                 <div className="space-y-3">
                   {matches.map((match: Match) => (
@@ -346,10 +449,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                       </div>
                     </div>
                   ))}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+            </>
+          )}
         </div>
       )}
     </div>

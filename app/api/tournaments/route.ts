@@ -15,7 +15,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const tournamentType = body.type as 4 | 6 | 8;
+    const tournamentType = body.type as 4 | 6 | 8 | 12;
 
     // Validate tournament type and player count
     const config = TOURNAMENT_CONFIGS[tournamentType];
@@ -32,7 +32,12 @@ export async function POST(request: NextRequest) {
     const teams = generateTeams(body.playerIds, tournamentType);
 
     // Generate round robin matches
-    const roundRobinMatches = generateRoundRobinMatches(tournamentId, teams, config.useGroups);
+    const roundRobinMatches = generateRoundRobinMatches(
+      tournamentId,
+      teams,
+      config.useGroups,
+      config.groupCount
+    );
 
     const newTournament: Tournament = {
       id: tournamentId,

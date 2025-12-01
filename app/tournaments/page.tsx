@@ -12,7 +12,7 @@ export default function TournamentsPage() {
   const [formData, setFormData] = useState({
     name: '',
     date: '',
-    type: 4 as 4 | 6 | 8,
+    type: 4 as 4 | 6 | 8 | 12,
     playerIds: [] as string[],
   });
   const [loading, setLoading] = useState(true);
@@ -89,15 +89,15 @@ export default function TournamentsPage() {
         <button
           onClick={() => setShowForm(!showForm)}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          disabled={players.length < 4}
+          disabled={players.length < 8}
         >
           {showForm ? 'Cancel' : 'Create New Tournament'}
         </button>
       </div>
 
-      {players.length < 4 && (
+      {players.length < 8 && (
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded mb-6">
-          You need at least 4 registered players to create a tournament.
+          You need at least 8 registered players to create a 4-team tournament.
         </div>
       )}
 
@@ -128,7 +128,7 @@ export default function TournamentsPage() {
             <div>
               <label className="block mb-2 font-medium">Tournament Type</label>
               <div className="space-y-3">
-                {([4, 6, 8] as const).map((type) => {
+                {([4, 6, 8, 12] as const).map((type) => {
                   const config = TOURNAMENT_CONFIGS[type];
                   const hasEnoughPlayers = players.length >= config.requiredPlayers;
                   return (
@@ -150,7 +150,7 @@ export default function TournamentsPage() {
                         disabled={!hasEnoughPlayers}
                       />
                       <div className="flex-1">
-                        <div className="font-semibold">{type} Players Tournament</div>
+                        <div className="font-semibold">{config.requiredPlayers} Players Tournament ({type} teams)</div>
                         <div className="text-sm text-gray-600 dark:text-gray-400">
                           {config.description}
                         </div>

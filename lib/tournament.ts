@@ -3,58 +3,62 @@ import { Player, Team, Match, RoundRobinStanding, Tournament, TournamentConfig }
 /**
  * Tournament configurations for different types
  */
-export const TOURNAMENT_CONFIGS: Record<4 | 6 | 8, TournamentConfig> = {
+export const TOURNAMENT_CONFIGS: Record<4 | 6 | 8 | 12, TournamentConfig> = {
   4: {
     type: 4,
-    requiredPlayers: 4,
-    teamsCount: 6,
+    requiredPlayers: 8,
+    teamsCount: 4,
     useGroups: false,
-    advanceToKnockout: 2,
-    description: '4 players (6 teams) - Round robin, top 2 teams to final',
+    advanceToKnockout: 4,
+    description: '4 teams (8 players) - Round robin, then 1vs2 and 3vs4 semifinals',
   },
   6: {
     type: 6,
-    requiredPlayers: 6,
-    teamsCount: 15,
+    requiredPlayers: 12,
+    teamsCount: 6,
     useGroups: false,
-    advanceToKnockout: 4,
-    description: '6 players (15 teams) - Round robin, top 4 teams to semi-finals',
+    advanceToKnockout: 0,
+    description: '6 teams (12 players) - Round robin only, all teams play each other',
   },
   8: {
     type: 8,
-    requiredPlayers: 8,
+    requiredPlayers: 16,
     teamsCount: 8,
     useGroups: true,
-    advanceToKnockout: 4,
-    description: '8 players (2 groups of 4 teams) - Groups, top 2 from each group to semi-finals',
+    groupCount: 2,
+    advanceToKnockout: 8,
+    description: '8 teams (16 players) - 2 groups of 4, crossover knockouts, final and 3rd/4th place',
+  },
+  12: {
+    type: 12,
+    requiredPlayers: 24,
+    teamsCount: 12,
+    useGroups: true,
+    groupCount: 3,
+    advanceToKnockout: 12,
+    description: '12 teams (24 players) - 3 groups of 4, split into winners/middle/losers brackets',
   },
 };
 
 /**
- * Generate all unique team combinations from a list of players
+ * Generate teams by pairing players sequentially
  */
-export function generateTeams(playerIds: string[], tournamentType: 4 | 6 | 8): Team[] {
+export function generateTeams(playerIds: string[], tournamentType: 4 | 6 | 8 | 12): Team[] {
   const config = TOURNAMENT_CONFIGS[tournamentType];
-  const allTeams: Team[] = [];
+  const teams: Team[] = [];
 
-  // Generate all possible teams
-  for (let i = 0; i < playerIds.length; i++) {
-    for (let j = i + 1; j < playerIds.length; j++) {
-      allTeams.push({
-        player1Id: playerIds[i],
-        player2Id: playerIds[j],
-      });
-    }
+  // Shuffle players to randomize pairings
+  const shuffledPlayers = [...playerIds].sort(() => Math.random() - 0.5);
+
+  // Pair players sequentially: [0,1], [2,3], [4,5], etc.
+  for (let i = 0; i < config.teamsCount * 2; i += 2) {
+    teams.push({
+      player1Id: shuffledPlayers[i],
+      player2Id: shuffledPlayers[i + 1],
+    });
   }
 
-  // For 8-player tournaments, select 8 teams (4 per group)
-  if (tournamentType === 8) {
-    // Shuffle and select 8 teams
-    const shuffled = allTeams.sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 8);
-  }
-
-  return allTeams;
+  return teams;
 }
 
 /**
@@ -63,11 +67,12 @@ export function generateTeams(playerIds: string[], tournamentType: 4 | 6 | 8): T
 export function generateRoundRobinMatches(
   tournamentId: string,
   teams: Team[],
-  useGroups: boolean = false
+  useGroups: boolean = false,
+  groupCount?: number
 ): Match[] {
   const matches: Match[] = [];
 
-  if (useGroups && teams.length === 8) {
+  if (useGroups && groupCount === 2 && teams.length === 8) {
     // Split into 2 groups of 4 teams
     const groupA = teams.slice(0, 4);
     const groupB = teams.slice(4, 8);
@@ -97,6 +102,56 @@ export function generateRoundRobinMatches(
           team2: groupB[j],
           stage: 'round_robin',
           group: 'B',
+          completed: false,
+        });
+      }
+    }
+  } else if (useGroups && groupCount === 3 && teams.length === 12) {
+    // Split into 3 groups of 4 teams
+    const groupA = teams.slice(0, 4);
+    const groupB = teams.slice(4, 8);
+    const groupC = teams.slice(8, 12);
+
+    // Generate matches for Group A
+    for (let i = 0; i < groupA.length; i++) {
+      for (let j = i + 1; j < groupA.length; j++) {
+        matches.push({
+          id: `${tournamentId}-rr-a-${i}-${j}`,
+          tournamentId,
+          team1: groupA[i],
+          team2: groupA[j],
+          stage: 'round_robin',
+          group: 'A',
+          completed: false,
+        });
+      }
+    }
+
+    // Generate matches for Group B
+    for (let i = 0; i < groupB.length; i++) {
+      for (let j = i + 1; j < groupB.length; j++) {
+        matches.push({
+          id: `${tournamentId}-rr-b-${i}-${j}`,
+          tournamentId,
+          team1: groupB[i],
+          team2: groupB[j],
+          stage: 'round_robin',
+          group: 'B',
+          completed: false,
+        });
+      }
+    }
+
+    // Generate matches for Group C
+    for (let i = 0; i < groupC.length; i++) {
+      for (let j = i + 1; j < groupC.length; j++) {
+        matches.push({
+          id: `${tournamentId}-rr-c-${i}-${j}`,
+          tournamentId,
+          team1: groupC[i],
+          team2: groupC[j],
+          stage: 'round_robin',
+          group: 'C',
           completed: false,
         });
       }
@@ -133,7 +188,7 @@ export function getTeamKey(team: Team): string {
  */
 export function calculateRoundRobinStandings(
   matches: Match[],
-  group?: 'A' | 'B'
+  group?: 'A' | 'B' | 'C'
 ): RoundRobinStanding[] {
   // Filter matches by group if specified
   const relevantMatches = group
@@ -222,74 +277,206 @@ export function calculateRoundRobinStandings(
 export function generateKnockoutMatches(
   tournamentId: string,
   standings: RoundRobinStanding[],
-  tournamentType: 4 | 6 | 8,
+  tournamentType: 4 | 6 | 8 | 12,
   groupAStandings?: RoundRobinStanding[],
-  groupBStandings?: RoundRobinStanding[]
+  groupBStandings?: RoundRobinStanding[],
+  groupCStandings?: RoundRobinStanding[]
 ): Match[] {
   const matches: Match[] = [];
-  const config = TOURNAMENT_CONFIGS[tournamentType];
 
   if (tournamentType === 4) {
-    // 4 players: Top 2 teams go directly to final
-    if (standings.length < 2) return matches;
-
-    const topTeams = standings.slice(0, 2);
-    matches.push({
-      id: `${tournamentId}-final`,
-      tournamentId,
-      team1: { player1Id: topTeams[0].player1Id, player2Id: topTeams[0].player2Id },
-      team2: { player1Id: topTeams[1].player1Id, player2Id: topTeams[1].player2Id },
-      stage: 'final',
-      completed: false,
-    });
-  } else if (tournamentType === 6) {
-    // 6 players: Top 4 teams to semi-finals
+    // 4 teams (8 players): Round robin then semifinals (1vs2, 3vs4)
     if (standings.length < 4) return matches;
 
     const topTeams = standings.slice(0, 4);
 
-    // Semi-finals: 1st vs 4th, 2nd vs 3rd
+    // Semifinal 1: 1st vs 2nd
     matches.push({
       id: `${tournamentId}-sf-1`,
       tournamentId,
       team1: { player1Id: topTeams[0].player1Id, player2Id: topTeams[0].player2Id },
+      team2: { player1Id: topTeams[1].player1Id, player2Id: topTeams[1].player2Id },
+      stage: 'semi_final',
+      completed: false,
+    });
+
+    // Semifinal 2: 3rd vs 4th
+    matches.push({
+      id: `${tournamentId}-sf-2`,
+      tournamentId,
+      team1: { player1Id: topTeams[2].player1Id, player2Id: topTeams[2].player2Id },
       team2: { player1Id: topTeams[3].player1Id, player2Id: topTeams[3].player2Id },
       stage: 'semi_final',
       completed: false,
     });
-
-    matches.push({
-      id: `${tournamentId}-sf-2`,
-      tournamentId,
-      team1: { player1Id: topTeams[1].player1Id, player2Id: topTeams[1].player2Id },
-      team2: { player1Id: topTeams[2].player1Id, player2Id: topTeams[2].player2Id },
-      stage: 'semi_final',
-      completed: false,
-    });
+  } else if (tournamentType === 6) {
+    // 6 teams (12 players): Round robin only, NO knockout stage
+    return matches;
   } else if (tournamentType === 8) {
-    // 8 players with groups: Top 2 from each group to semi-finals
+    // 8 teams (16 players): 2 groups, crossover knockouts
     if (!groupAStandings || !groupBStandings) return matches;
-    if (groupAStandings.length < 2 || groupBStandings.length < 2) return matches;
+    if (groupAStandings.length < 4 || groupBStandings.length < 4) return matches;
 
-    const groupATop2 = groupAStandings.slice(0, 2);
-    const groupBTop2 = groupBStandings.slice(0, 2);
+    const groupA = groupAStandings.slice(0, 4);
+    const groupB = groupBStandings.slice(0, 4);
 
-    // Semi-finals: A1 vs B2, B1 vs A2
+    // Crossover quarterfinals
+    // Match 1: 1A vs 2B
     matches.push({
-      id: `${tournamentId}-sf-1`,
+      id: `${tournamentId}-qf-1`,
       tournamentId,
-      team1: { player1Id: groupATop2[0].player1Id, player2Id: groupATop2[0].player2Id },
-      team2: { player1Id: groupBTop2[1].player1Id, player2Id: groupBTop2[1].player2Id },
-      stage: 'semi_final',
+      team1: { player1Id: groupA[0].player1Id, player2Id: groupA[0].player2Id },
+      team2: { player1Id: groupB[1].player1Id, player2Id: groupB[1].player2Id },
+      stage: 'quarter_final',
       completed: false,
     });
 
+    // Match 2: 1B vs 2A
     matches.push({
-      id: `${tournamentId}-sf-2`,
+      id: `${tournamentId}-qf-2`,
       tournamentId,
-      team1: { player1Id: groupBTop2[0].player1Id, player2Id: groupBTop2[0].player2Id },
-      team2: { player1Id: groupATop2[1].player1Id, player2Id: groupATop2[1].player2Id },
-      stage: 'semi_final',
+      team1: { player1Id: groupB[0].player1Id, player2Id: groupB[0].player2Id },
+      team2: { player1Id: groupA[1].player1Id, player2Id: groupA[1].player2Id },
+      stage: 'quarter_final',
+      completed: false,
+    });
+
+    // Match 3: 3A vs 4B
+    matches.push({
+      id: `${tournamentId}-qf-3`,
+      tournamentId,
+      team1: { player1Id: groupA[2].player1Id, player2Id: groupA[2].player2Id },
+      team2: { player1Id: groupB[3].player1Id, player2Id: groupB[3].player2Id },
+      stage: 'quarter_final',
+      completed: false,
+    });
+
+    // Match 4: 3B vs 4A
+    matches.push({
+      id: `${tournamentId}-qf-4`,
+      tournamentId,
+      team1: { player1Id: groupB[2].player1Id, player2Id: groupB[2].player2Id },
+      team2: { player1Id: groupA[3].player1Id, player2Id: groupA[3].player2Id },
+      stage: 'quarter_final',
+      completed: false,
+    });
+  } else if (tournamentType === 12) {
+    // 12 teams (24 players): 3 groups of 4, complex bracket system
+    if (!groupAStandings || !groupBStandings || !groupCStandings) return matches;
+    if (groupAStandings.length < 4 || groupBStandings.length < 4 || groupCStandings.length < 4) return matches;
+
+    // Get standings for each position
+    const firsts = [groupAStandings[0], groupBStandings[0], groupCStandings[0]];
+    const seconds = [groupAStandings[1], groupBStandings[1], groupCStandings[1]];
+    const thirds = [groupAStandings[2], groupBStandings[2], groupCStandings[2]];
+    const fourths = [groupAStandings[3], groupBStandings[3], groupCStandings[3]];
+
+    // Sort to find best teams
+    const sortedFirsts = [...firsts].sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      const aSetDiff = a.setsWon - a.setsLost;
+      const bSetDiff = b.setsWon - b.setsLost;
+      if (bSetDiff !== aSetDiff) return bSetDiff - aSetDiff;
+      const aGameDiff = a.gamesWon - a.gamesLost;
+      const bGameDiff = b.gamesWon - b.gamesLost;
+      return bGameDiff - aGameDiff;
+    });
+
+    const sortedSeconds = [...seconds].sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      const aSetDiff = a.setsWon - a.setsLost;
+      const bSetDiff = b.setsWon - b.setsLost;
+      if (bSetDiff !== aSetDiff) return bSetDiff - aSetDiff;
+      const aGameDiff = a.gamesWon - a.gamesLost;
+      const bGameDiff = b.gamesWon - b.gamesLost;
+      return bGameDiff - aGameDiff;
+    });
+
+    const sortedThirds = [...thirds].sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      const aSetDiff = a.setsWon - a.setsLost;
+      const bSetDiff = b.setsWon - b.setsLost;
+      if (bSetDiff !== aSetDiff) return bSetDiff - aSetDiff;
+      const aGameDiff = a.gamesWon - a.gamesLost;
+      const bGameDiff = b.gamesWon - b.gamesLost;
+      return bGameDiff - aGameDiff;
+    });
+
+    // WINNERS BRACKET (1st-4th place): 3 group winners + best 2nd
+    const winnersBracket = [...sortedFirsts, sortedSeconds[0]];
+
+    // Semifinal 1: Best 1st vs 2nd best 2nd
+    matches.push({
+      id: `${tournamentId}-winners-sf-1`,
+      tournamentId,
+      team1: { player1Id: winnersBracket[0].player1Id, player2Id: winnersBracket[0].player2Id },
+      team2: { player1Id: winnersBracket[3].player1Id, player2Id: winnersBracket[3].player2Id },
+      stage: 'bracket_semi',
+      bracket: 'winners',
+      completed: false,
+    });
+
+    // Semifinal 2: 2nd best 1st vs 3rd best 1st
+    matches.push({
+      id: `${tournamentId}-winners-sf-2`,
+      tournamentId,
+      team1: { player1Id: winnersBracket[1].player1Id, player2Id: winnersBracket[1].player2Id },
+      team2: { player1Id: winnersBracket[2].player1Id, player2Id: winnersBracket[2].player2Id },
+      stage: 'bracket_semi',
+      bracket: 'winners',
+      completed: false,
+    });
+
+    // MIDDLE BRACKET (5th-8th place): Other 2 second places + 2 best 3rds
+    const middleBracket = [sortedSeconds[1], sortedSeconds[2], sortedThirds[0], sortedThirds[1]];
+
+    // Semifinal 1
+    matches.push({
+      id: `${tournamentId}-middle-sf-1`,
+      tournamentId,
+      team1: { player1Id: middleBracket[0].player1Id, player2Id: middleBracket[0].player2Id },
+      team2: { player1Id: middleBracket[3].player1Id, player2Id: middleBracket[3].player2Id },
+      stage: 'bracket_semi',
+      bracket: 'middle',
+      completed: false,
+    });
+
+    // Semifinal 2
+    matches.push({
+      id: `${tournamentId}-middle-sf-2`,
+      tournamentId,
+      team1: { player1Id: middleBracket[1].player1Id, player2Id: middleBracket[1].player2Id },
+      team2: { player1Id: middleBracket[2].player1Id, player2Id: middleBracket[2].player2Id },
+      stage: 'bracket_semi',
+      bracket: 'middle',
+      completed: false,
+    });
+
+    // LOSERS BRACKET (9th-12th place): Worst 3rd + all 4ths
+    const losersBracket = [sortedThirds[2], ...fourths];
+
+    // Semifinal 1
+    matches.push({
+      id: `${tournamentId}-losers-sf-1`,
+      tournamentId,
+      team1: { player1Id: losersBracket[0].player1Id, player2Id: losersBracket[0].player2Id },
+      team2: { player1Id: losersBracket[3].player1Id, player2Id: losersBracket[3].player2Id },
+      stage: 'bracket_semi',
+      bracket: 'losers',
+      completed: false,
+    });
+
+    // Semifinal 2
+    matches.push({
+      id: `${tournamentId}-losers-sf-2`,
+      tournamentId,
+      team1: { player1Id: losersBracket[1].player1Id, player2Id: losersBracket[1].player2Id },
+      team2: { player1Id: losersBracket[2].player1Id, player2Id: losersBracket[2].player2Id },
+      stage: 'bracket_semi',
+      bracket: 'losers',
       completed: false,
     });
   }

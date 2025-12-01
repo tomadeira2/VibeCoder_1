@@ -23,10 +23,10 @@ export const TOURNAMENT_CONFIGS: Record<4 | 6 | 8, TournamentConfig> = {
   8: {
     type: 8,
     requiredPlayers: 8,
-    teamsCount: 8,
+    teamsCount: 12,
     useGroups: true,
     advanceToKnockout: 4,
-    description: '8 players (2 groups of 4 teams) - Groups, top 2 from each group to semi-finals',
+    description: '8 players (12 teams in 2 brackets of 6) - Brackets, top 2 from each bracket to semi-finals',
   },
 };
 
@@ -47,11 +47,11 @@ export function generateTeams(playerIds: string[], tournamentType: 4 | 6 | 8): T
     }
   }
 
-  // For 8-player tournaments, select 8 teams (4 per group)
+  // For 8-player tournaments, select 12 teams (6 per bracket)
   if (tournamentType === 8) {
-    // Shuffle and select 8 teams
+    // Shuffle and select 12 teams
     const shuffled = allTeams.sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 8);
+    return shuffled.slice(0, 12);
   }
 
   return allTeams;
@@ -67,12 +67,12 @@ export function generateRoundRobinMatches(
 ): Match[] {
   const matches: Match[] = [];
 
-  if (useGroups && teams.length === 8) {
-    // Split into 2 groups of 4 teams
-    const groupA = teams.slice(0, 4);
-    const groupB = teams.slice(4, 8);
+  if (useGroups && teams.length === 12) {
+    // Split into 2 brackets of 6 teams each
+    const groupA = teams.slice(0, 6);
+    const groupB = teams.slice(6, 12);
 
-    // Generate matches for Group A
+    // Generate matches for Bracket A
     for (let i = 0; i < groupA.length; i++) {
       for (let j = i + 1; j < groupA.length; j++) {
         matches.push({
@@ -87,7 +87,7 @@ export function generateRoundRobinMatches(
       }
     }
 
-    // Generate matches for Group B
+    // Generate matches for Bracket B
     for (let i = 0; i < groupB.length; i++) {
       for (let j = i + 1; j < groupB.length; j++) {
         matches.push({

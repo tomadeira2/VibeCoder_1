@@ -183,7 +183,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
         <div className="grid md:grid-cols-2 gap-6 mb-6">
           {groupAStandings.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <h2 className="text-2xl font-bold mb-4">Group A Standings</h2>
+              <h2 className="text-2xl font-bold mb-4">Bracket A Standings</h2>
               {renderStandingsTable(groupAStandings, true, 2)}
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
                 Top 2 teams advance to semi-finals
@@ -192,7 +192,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           )}
           {groupBStandings.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <h2 className="text-2xl font-bold mb-4">Group B Standings</h2>
+              <h2 className="text-2xl font-bold mb-4">Bracket B Standings</h2>
               {renderStandingsTable(groupBStandings, true, 2)}
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
                 Top 2 teams advance to semi-finals
@@ -226,7 +226,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
             return (
               <div key={group} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-                <h2 className="text-2xl font-bold mb-4">Group {group} Matches</h2>
+                <h2 className="text-2xl font-bold mb-4">Bracket {group} Matches</h2>
                 <div className="space-y-3">
                   {groupMatches.map((match: Match) => (
                     <div
